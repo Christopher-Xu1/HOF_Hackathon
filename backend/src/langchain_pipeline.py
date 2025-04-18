@@ -9,6 +9,9 @@ from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema.output_parser import StrOutputParser
 
+import tabula
+import pandas as pd
+
 load_dotenv()
 
 # --------------------------------------------------------------------------
@@ -68,8 +71,42 @@ def process_earnings_pdf(pdf_path: str) -> Tuple[List[str], List[dict]]:
 #Placeholders (replace w implementations later)
 # --------------------------------------------------------------------------
 def extract_tables(pdf_path: str) -> List[str]:
-    """Table extraction (your teammate's work)."""
-    return []
+    tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True, stream=True)
+    return [fix_table_formatting(t) for t in tables]
+
+def fix_table_formatting(table: pd.DataFrame):
+    # `apply` analyzes the table, vertically by default
+    # the lambda we define returns a single bool for a column, which is basically if there is 
+    df_clean: pd.DataFrame = table.loc[:, ~table.apply(lambda col: (col.isna() | col.eq('$')).all())]
+    
+    fixed_rows: list[tuple[str]] = []
+    buffer: tuple[str] = None
+    
+    for row in df_clean.itertuples(index=False):
+        clean_row = [str(cell) if pd.notna(cell) else "" for cell in row]
+        is_continuation = buffer is not None and (not row[0] or str(row[0])[0].islower())
+        is_incomplete = sum(bool(cell) for cell in clean_row) < len(clean_row)
+
+        if is_continuation:
+            buffer = tuple(
+                (a if a else "") + "\n" + (b if b else "")
+                for a, b in zip(buffer, clean_row)
+            )
+        else:
+            if buffer:
+                fixed_rows.append(buffer)
+                buffer = None
+
+            if is_incomplete:
+                buffer = clean_row
+            else:
+                fixed_rows.append(clean_row)
+
+    if buffer:
+        fixed_rows.append(buffer)
+        
+    return pd.DataFrame(fixed_rows, columns=df_clean.columns)
+
 # src/extract/pdf_utils.py
 import pdfplumber, pathlib, re, statistics
 from typing import List, Tuple
