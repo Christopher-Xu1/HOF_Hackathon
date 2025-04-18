@@ -2,13 +2,12 @@
 from __future__ import annotations
 import os, json
 from typing import List, Tuple
-
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema.output_parser import StrOutputParser
-
+import pdfplumber, pathlib, re, statistics
 import tabula
 import pandas as pd
 
@@ -107,9 +106,27 @@ def fix_table_formatting(table: pd.DataFrame):
         
     return pd.DataFrame(fixed_rows, columns=df_clean.columns)
 
-# src/extract/pdf_utils.py
-import pdfplumber, pathlib, re, statistics
-from typing import List, Tuple
+def title_tables(csv_folder: str) -> List[Tuple[Path, str]]:
+    """
+    Read every CSV in `csv_folder`, use the LLM to generate a title,
+    and return a list of (path, title).
+    """
+    llm = _make_llm()
+    chain = LLMChain(prompt=_PROMPT, llm=llm)
+    titles = []
+
+    for csv_path in sorted(Path(csv_folder).glob("*.csv")):
+        df = pd.read_csv(csv_path)
+        # join columns
+        cols = ", ".join(df.columns.tolist())
+        # take 3 sample rows as CSV text
+        sample = df.head(3).to_csv(index=False)
+        # ask the LLM
+        title = chain.run(columns=cols, sample_rows=sample).strip().strip('"')
+        titles.append((csv_path, title))
+
+    return titles
+
 
 _NUM_RE   = re.compile(r"\d[\d,\.]*")
 _ALPHA_RE = re.compile(r"[A-Za-z]")

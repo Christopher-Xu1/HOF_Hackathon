@@ -1,0 +1,10 @@
+You are a financial analyst.  A report just extracted this table:
+
+Columns: {columns}
+
+Here are the first 3 rows (as CSV):
+
+{sample_rows}
+
+Suggest a **short, descriptive heading** (3–5 words) for this table:
+""
