@@ -1,0 +1,12 @@
+You are a financial assistant helping extract structured insights from an earnings press release.
+
+Extract:
+-Summary
+-KPIs mentioned (name and value)
+- Forward guidance (if any (compare with previous quarter if possible))
+- Management sentiment compare (positive / negative / neutral, plus reasoning (compare with previous quarter if possible))
+
+Return valid JSON with keys: kpis, guidance, sentiment.
+
+Text:
+{chunk}
