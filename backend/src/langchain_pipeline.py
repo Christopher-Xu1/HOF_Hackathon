@@ -4,7 +4,7 @@ import os, json
 from typing import List, Tuple
 
 from dotenv import load_dotenv
-from langchain_openai import ChatOpenAI
+from openai import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema.output_parser import StrOutputParser
@@ -18,7 +18,7 @@ load_dotenv()
 # 1. Load custom prompt from a txt file
 # --------------------------------------------------------------------------
 def _load_prompt() -> PromptTemplate:
-    with open("src/prompts/earnings_summarization.txt") as f:
+    with open("backend/src/prompts/earnings_summarization.txt") as f:
         prompt_text = f.read()
     return PromptTemplate(input_variables=["chunk"], template=prompt_text)
 
@@ -27,11 +27,9 @@ def _load_prompt() -> PromptTemplate:
 # --------------------------------------------------------------------------
 def _build_chain():
     prompt = _load_prompt()
-    llm = ChatOpenAI(
-        model="mistralai/Mixtral-8x7b-instruct",
+    llm = OpenAI(
         base_url=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
-        api_key=os.getenv("OPENROUTER_API_KEY"),
-        temperature=0,
+        api_key=os.getenv("OPENROUTER_API_KEY")
     )
     return prompt | llm | StrOutputParser()
 
@@ -41,12 +39,12 @@ def _build_chain():
 def process_earnings_pdf(pdf_path: str) -> Tuple[List[str], List[dict]]:
     """
     Returns:
-        - table_csvs: List of CSV file paths from table pages (handled elsewhere)
+        - table_csvs: List of Pandas DataFrame objects (handled elsewhere)
         - llm_summary: List of parsed JSON dicts from narrative text
     """
 
-    table_csvs: List[str] = extract_tables(pdf_path)        
-    narrative_text: str = extract_narrative_text(pdf_path)  
+    table_csvs: List[str] = extract_tables(pdf_path)
+    narrative_text: str = extract_narrative_text(pdf_path)
 
     if not narrative_text.strip():
         return table_csvs, []
@@ -67,9 +65,6 @@ def process_earnings_pdf(pdf_path: str) -> Tuple[List[str], List[dict]]:
 
     return table_csvs, parsed_chunks
 
-# --------------------------------------------------------------------------
-#Placeholders (replace w implementations later)
-# --------------------------------------------------------------------------
 def extract_tables(pdf_path: str) -> List[str]:
     tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True, stream=True)
     return [fix_table_formatting(t) for t in tables]
@@ -138,7 +133,7 @@ def _drop_repeating_lines(pages: List[str], top_n=3, bottom_n=3) -> List[str]:
         cleaned.append("\n".join(lines))
     return cleaned
 
-def extract_narrative_text(pdf_path: str, umeric_threshold: float = 0.33, min_chars: int = 100, debug: bool = False) -> str:
+def extract_narrative_text(pdf_path: str, numeric_threshold: float = 0.33, min_chars: int = 100, debug: bool = False) -> str:
     narrative_pages: List[str] = []
     with pdfplumber.open(pdf_path) as pdf:
         for i,page in enumerate(pdf.pages):
@@ -176,4 +171,3 @@ def extract_narrative_text(pdf_path: str, umeric_threshold: float = 0.33, min_ch
     # strip headers/footers
     cleaned = _drop_repeating_lines(narrative_pages)
     return "\n\n".join(cleaned).strip()
-
