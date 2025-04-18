@@ -42,8 +42,8 @@ def process_earnings_pdf(pdf_path: str) -> Tuple[List[str], List[dict]]:
         - llm_summary: List of parsed JSON dicts from narrative text
     """
 
-    table_csvs: List[str] = extract_tables(pdf_path)         # <-- implemented separately
-    narrative_text: str = extract_narrative_text(pdf_path)   # <-- your job to implement cleanly
+    table_csvs: List[str] = extract_tables(pdf_path)        
+    narrative_text: str = extract_narrative_text(pdf_path)  
 
     if not narrative_text.strip():
         return table_csvs, []
