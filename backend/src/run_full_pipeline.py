@@ -1,16 +1,21 @@
-from langchain_pipeline import extract_tables, extract_narrative_text, title_tables, process_earnings_pdf
-def main(pdf_path):
-    # 1) split into table pages vs narrative pages
-    table_paths = extract_tables(pdf_path, out_dir="tables/")
-    narrative = extract_narrative_text(pdf_path)
+#!/usr/bin/env python3
+import sys, os, json
+from pathlib import Path
 
-    # 2) auto‐title each table
-    print("→ Generating titles for tables…")
-    titled = title_tables("tables/")
-    for path, heading in titled:
-        print(f"  • {path.name} → {heading}")
+from langchain_pipeline import extract_narrative_text
+from langchain_pipeline import process_narrative_text
 
-    # 3) summarize narrative via LLM
+def main(pdf_path: str):
+    if not os.path.isfile(pdf_path):
+        print(f"Error: file not found: {pdf_path}")
+        sys.exit(1)
+
+    print(f"→ Extracting narrative text from: {pdf_path}")
+    narrative = extract_narrative_text(pdf_path, debug=True)
+    print(f"\n--- Narrative ({len(narrative)} chars) ---\n")
+    print(narrative[:500] + ("\n…" if len(narrative) > 500 else ""))
+
+    print("\n→ Running LLM summary on narrative…")
     summary = process_narrative_text(narrative)
-    print("→ Narrative summary JSON:")
+    print("\n--- LLM JSON Output ---\n")
     print(json.dumps(summary, indent=2))
