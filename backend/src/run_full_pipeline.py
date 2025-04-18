@@ -2,11 +2,8 @@
 import sys, os, json
 from pathlib import Path
 
-# make sure your package root is on PYTHONPATH
-sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
-
-from extract.pdf_utils   import extract_narrative_text
-from extract.langchain_pipeline import process_narrative_text
+from langchain_pipeline import extract_narrative_text
+from langchain_pipeline import process_narrative_text
 
 def main(pdf_path: str):
     if not os.path.isfile(pdf_path):
