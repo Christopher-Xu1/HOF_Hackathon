@@ -17,3 +17,9 @@ def main(pdf_path: str):
     summary = process_earnings_pdf(narrative)
     print("\n--- LLM JSON Output ---\n")
     print(json.dumps(summary, indent=2))
+    
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print(f"Usage: {Path(__file__).name} <path_to_pdf>")
+        sys.exit(1)
+    main(sys.argv[1])
