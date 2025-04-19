@@ -1,4 +1,4 @@
-# src/extract/llm_narrative_pipeline.py
+# langchain_pipeline.py
 from __future__ import annotations
 import os, json
 from typing import List, Tuple
@@ -11,9 +11,11 @@ import pdfplumber, pathlib, re, statistics
 import tabula
 import pandas as pd
 
-load_dotenv()
+load_dotenv("backend/src/.env")   # path relative to this file
+os.environ["JAVA_HOME"] = "/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home"# --------------------------------------------------------------------------
+assert os.getenv("OPENAI_API_BASE"), "API base not set"
+assert os.getenv("OPENROUTER_API_KEY"), "Key not set"
 
-# --------------------------------------------------------------------------
 # 1. Load custom prompt from a txt file
 # --------------------------------------------------------------------------
 def _load_prompt() -> PromptTemplate:
@@ -24,25 +26,23 @@ def _load_prompt() -> PromptTemplate:
 # --------------------------------------------------------------------------
 # 2. Build the LLM chain (OpenRouter)
 # --------------------------------------------------------------------------
-def _build_chain():
-    with open("src/extract/prompts/earnings_extraction.txt") as f:
-        template = f.read()
 
+def _build_chain():
     prompt = PromptTemplate(
-        template=template,
-        input_variables=["chunk"],   # we removed kpis for now
+        template=open("backend/src/prompts/earnings_summarization.txt").read(),
+        input_variables=["chunk"],
     )
 
-    # ***  use OpenRouter creds  ***
     llm = ChatOpenAI(
-        model="mistralai/Mixtral-8x7b-instruct",   # free/cheap model on OpenRouter
-        base_url=os.getenv("OPENAI_BASE_URL"),     # https://openrouter.ai/api/v1
-        api_key=os.getenv("OPENROUTER_API_KEY"),
+        model="mistralai/Mixtral-8x7b-instruct",
+        openai_api_base=os.getenv("OPENAI_API_BASE"),   # "https://openrouter.ai/api/v1"
+        openai_api_key =os.getenv("OPENROUTER_API_KEY"),
         temperature=0,
     )
+    
 
-    chain = prompt | llm | StrOutputParser()
-    return chain
+    return prompt | llm | StrOutputParser()
+
 
 # --------------------------------------------------------------------------
 # 3. Public entry-point: Process PDF
@@ -75,6 +75,26 @@ def process_earnings_pdf(pdf_path: str) -> Tuple[List[str], List[dict]]:
             continue
 
     return table_csvs, parsed_chunks
+
+
+
+def run_pipeline_on_text(raw_text: str) -> List[dict]:
+    splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
+    chunks = splitter.split_text(raw_text)
+
+    chain = _build_chain()
+    results = []
+
+    for chunk in chunks:
+        try:
+            out = chain.invoke({"chunk": chunk})
+            results.append(json.loads(out))
+        except json.JSONDecodeError:
+            print("Skipping malformed output")
+            continue
+
+    return results
+
 
 def extract_tables(pdf_path: str) -> List[str]:
     tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True, stream=True)
@@ -119,11 +139,12 @@ def title_tables(csv_folder: str) -> List[Tuple[Path, str]]:
     and return a list of (path, title).
     """
     llm = ChatOpenAI(
-        model="mistralai/Mixtral-8x7b-instruct",   # free/cheap model on OpenRouter
-        base_url=os.getenv("OPENAI_BASE_URL"),     # https://openrouter.ai/api/v1
-        api_key=os.getenv("OPENROUTER_API_KEY"),
+        model="mistralai/Mixtral-8x7b-instruct",
+        openai_api_base=os.getenv("OPENAI_API_BASE"),
+        openai_api_key =os.getenv("OPENROUTER_API_KEY"),
         temperature=0,
     )
+
     chain = _build_chain()
     titles = []
 
