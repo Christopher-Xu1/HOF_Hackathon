@@ -118,8 +118,13 @@ def title_tables(csv_folder: str) -> List[Tuple[Path, str]]:
     Read every CSV in `csv_folder`, use the LLM to generate a title,
     and return a list of (path, title).
     """
-    llm = _make_llm()
-    chain = LLMChain(prompt=_PROMPT, llm=llm)
+    llm = ChatOpenAI(
+        model="mistralai/Mixtral-8x7b-instruct",   # free/cheap model on OpenRouter
+        base_url=os.getenv("OPENAI_BASE_URL"),     # https://openrouter.ai/api/v1
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+        temperature=0,
+    )
+    chain = _build_chain()
     titles = []
 
     for csv_path in sorted(Path(csv_folder).glob("*.csv")):
