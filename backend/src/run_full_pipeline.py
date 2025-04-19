@@ -2,9 +2,7 @@
 import sys, os, json
 from pathlib import Path
 
-from langchain_pipeline import extract_narrative_text
-from langchain_pipeline import process_narrative_text
-
+from langchain_pipeline import extract_narrative_text, process_earnings_pdf
 def main(pdf_path: str):
     if not os.path.isfile(pdf_path):
         print(f"Error: file not found: {pdf_path}")
@@ -16,6 +14,6 @@ def main(pdf_path: str):
     print(narrative[:500] + ("\n…" if len(narrative) > 500 else ""))
 
     print("\n→ Running LLM summary on narrative…")
-    summary = process_narrative_text(narrative)
+    summary = process_earnings_pdf(narrative)
     print("\n--- LLM JSON Output ---\n")
     print(json.dumps(summary, indent=2))

@@ -25,12 +25,24 @@ def _load_prompt() -> PromptTemplate:
 # 2. Build the LLM chain (OpenRouter)
 # --------------------------------------------------------------------------
 def _build_chain():
-    prompt = _load_prompt()
-    llm = OpenAI(
-        base_url=os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1"),
-        api_key=os.getenv("OPENROUTER_API_KEY")
+    with open("src/extract/prompts/earnings_extraction.txt") as f:
+        template = f.read()
+
+    prompt = PromptTemplate(
+        template=template,
+        input_variables=["chunk"],   # we removed kpis for now
     )
-    return prompt | llm | StrOutputParser()
+
+    # ***  use OpenRouter creds  ***
+    llm = ChatOpenAI(
+        model="mistralai/Mixtral-8x7b-instruct",   # free/cheap model on OpenRouter
+        base_url=os.getenv("OPENAI_BASE_URL"),     # https://openrouter.ai/api/v1
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+        temperature=0,
+    )
+
+    chain = prompt | llm | StrOutputParser()
+    return chain
 
 # --------------------------------------------------------------------------
 # 3. Public entry-point: Process PDF
