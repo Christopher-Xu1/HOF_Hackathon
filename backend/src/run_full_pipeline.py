@@ -8,13 +8,13 @@ def main(pdf_path: str):
         print(f"Error: file not found: {pdf_path}")
         sys.exit(1)
 
-    print(f"→ Extracting narrative text from: {pdf_path}")
-    narrative = extract_narrative_text(pdf_path, debug=True)
-    print(f"\n--- Narrative ({len(narrative)} chars) ---\n")
-    print(narrative[:500] + ("\n…" if len(narrative) > 500 else ""))
+    # print(f"→ Extracting narrative text from: {pdf_path}")
+    # narrative = extract_narrative_text(pdf_path, debug=True)
+    # print(f"\n--- Narrative ({len(narrative)} chars) ---\n")
+    # print(narrative[:500] + ("\n…" if len(narrative) > 500 else ""))
 
     print("\n→ Running LLM summary on narrative…")
-    summary = process_earnings_pdf(narrative)
+    summary = process_earnings_pdf(pdf_path=pdf_path)
     print("\n--- LLM JSON Output ---\n")
     print(json.dumps(summary, indent=2))
     

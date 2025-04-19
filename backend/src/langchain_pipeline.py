@@ -7,9 +7,15 @@ from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema.output_parser import StrOutputParser
-import pdfplumber, pathlib, re, statistics
+from langchain.docstore.document import Document
+from langchain.embeddings.openai import OpenAIEmbeddings
+from langchain.chains.retrieval_qa.base import RetrievalQA
+from langchain.vectorstores import Chroma
+import pdfplumber
+import re
 import tabula
 import pandas as pd
+from pandas import DataFrame
 
 load_dotenv()
 
@@ -25,7 +31,7 @@ def _load_prompt() -> PromptTemplate:
 # 2. Build the LLM chain (OpenRouter)
 # --------------------------------------------------------------------------
 def _build_chain():
-    with open("src/extract/prompts/earnings_extraction.txt") as f:
+    with open("backend/src/prompts/earnings_summarization.txt") as f:
         template = f.read()
 
     prompt = PromptTemplate(
@@ -40,8 +46,29 @@ def _build_chain():
         api_key=os.getenv("OPENROUTER_API_KEY"),
         temperature=0,
     )
+    
+    embeddings = OpenAIEmbeddings()
+    vectorstore = Chroma(
+        collection_name="earnings_docs",
+        embedding_function=embeddings,
+        persist_directory="chroma_index"
+    )
 
-    chain = prompt | llm | StrOutputParser()
+    # Create the retriever with metadata filtering if needed
+    retriever = vectorstore.as_retriever(
+        search_kwargs={
+            #"k": 5,  # number of relevant docs to retrieve
+            #"filter": {"company": "Amazon", "quarter": "Q4 2025"}  # example filter
+        }
+    )
+    
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        retriever=retriever,
+        return_source_documents=True
+    )
+
+    chain = prompt | qa_chain | StrOutputParser()
     return chain
 
 # --------------------------------------------------------------------------
@@ -54,11 +81,11 @@ def process_earnings_pdf(pdf_path: str) -> Tuple[List[str], List[dict]]:
         - llm_summary: List of parsed JSON dicts from narrative text
     """
 
-    table_csvs: List[str] = extract_tables(pdf_path)
+    tables: List[str] = extract_tables(pdf_path)
     narrative_text: str = extract_narrative_text(pdf_path)
 
     if not narrative_text.strip():
-        return table_csvs, []
+        return tables, []
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
     chunks = splitter.split_text(narrative_text)
@@ -66,15 +93,38 @@ def process_earnings_pdf(pdf_path: str) -> Tuple[List[str], List[dict]]:
     chain = _build_chain()
     parsed_chunks: List[dict] = []
 
-    for chunk in chunks:
+    embeddings = OpenAIEmbeddings()
+
+    # Create or load the Chroma vector DB
+    vectorstore = Chroma(
+        collection_name="earnings_docs",
+        embedding_function=embeddings,
+        persist_directory="chroma_index"  # directory to persist the DB
+    )
+
+    vector_documents: List[Document]
+    for i, chunk in enumerate(chunks):
         try:
             raw = chain.invoke({"chunk": chunk})
-            parsed_chunks.append(json.loads(raw))
+            parsed = json.loads(raw)
+            parsed_chunks.append(parsed)
+            
+            vector_documents.append(Document(
+                page_content=chunk,
+                metadata={
+                    "chunk_id": 1,
+                    "source": os.path.basename(pdf_path)
+                }
+            ))
         except json.JSONDecodeError:
             print("Skipping malformed output")
             continue
+        
+    vectorstore.add_documents(vector_documents)
+    # Save to disk
+    vectorstore.persist()
 
-    return table_csvs, parsed_chunks
+    return tables, parsed_chunks
 
 def extract_tables(pdf_path: str) -> List[str]:
     tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True, stream=True)
@@ -113,10 +163,10 @@ def fix_table_formatting(table: pd.DataFrame):
         
     return pd.DataFrame(fixed_rows, columns=df_clean.columns)
 
-def title_tables(csv_folder: str) -> List[Tuple[Path, str]]:
+def title_tables(tables: List[DataFrame]) -> List[Tuple[str, DataFrame]]:
     """
-    Read every CSV in `csv_folder`, use the LLM to generate a title,
-    and return a list of (path, title).
+    Read every table DataFrame, use the LLM to generate a title,
+    and return a list of (name, table).
     """
     llm = ChatOpenAI(
         model="mistralai/Mixtral-8x7b-instruct",   # free/cheap model on OpenRouter
@@ -127,15 +177,15 @@ def title_tables(csv_folder: str) -> List[Tuple[Path, str]]:
     chain = _build_chain()
     titles = []
 
-    for csv_path in sorted(Path(csv_folder).glob("*.csv")):
-        df = pd.read_csv(csv_path)
+    for df in tables:
+        #df = pd.read_csv(csv_path)
         # join columns
         cols = ", ".join(df.columns.tolist())
         # take 3 sample rows as CSV text
         sample = df.head(3).to_csv(index=False)
         # ask the LLM
         title = chain.run(columns=cols, sample_rows=sample).strip().strip('"')
-        titles.append((csv_path, title))
+        titles.append((title, df))
 
     return titles
 
