@@ -1,4 +1,4 @@
 backend/data/
 .history/
-.venv/
+venv/
 __pycache__/
