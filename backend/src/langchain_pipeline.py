@@ -5,12 +5,9 @@ from typing import List, Tuple
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter, TokenTextSplitter
+from langchain_core.runnables import RunnableParallel, RunnableLambda  # Corrected imports
 from langchain.schema.output_parser import StrOutputParser
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.docstore.document import Document
-from langchain.chains.retrieval_qa.base import RetrievalQA
-from langchain.vectorstores import Chroma
 import pdfplumber, pathlib, re, statistics
 import tabula
 import pandas as pd
@@ -44,123 +41,73 @@ def _build_chain():
         temperature=0,
     )
     
-    embedding_model = HuggingFaceEmbeddings(
-        model_name="all-MiniLM-L6-v2"  # Or try 'all-mpnet-base-v2' for higher accuracy
-    )
-    vectorstore = Chroma(
-        collection_name="earnings_docs",
-        embedding_function=embedding_model,
-        persist_directory="chroma_index"
-    )
 
-    # Create the retriever with metadata filtering if needed
-    retriever = vectorstore.as_retriever(
-        search_kwargs={
-            #"k": 5,  # number of relevant docs to retrieve
-            #"filter": {"company": "Amazon", "quarter": "Q4 2025"}  # example filter
-        }
-    )
-    
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        retriever=retriever,
-        return_source_documents=True
-    )
-
-    return prompt | qa_chain | StrOutputParser()
+    return prompt | llm | StrOutputParser()
 
 
 # --------------------------------------------------------------------------
 # 3. Public entry-point: Process PDF
 # --------------------------------------------------------------------------
-def process_earnings_pdf(pdf_path: str) -> Tuple[List[pd.DataFrame], List[dict]]:
+def process_earnings_pdf(pdf_path: str) -> Tuple[List[str], List[dict]]:
     """
     Returns:
         - table_csvs: List of Pandas DataFrame objects (handled elsewhere)
         - llm_summary: List of parsed JSON dicts from narrative text
     """
 
-    tables: List[pd.DataFrame] = extract_tables(pdf_path)
+    table_csvs: List[str] = extract_tables(pdf_path)
     narrative_text: str = extract_narrative_text(pdf_path)
 
     if not narrative_text.strip():
-        return tables, []
+        return table_csvs, []
 
-    splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
+    # Use TokenTextSplitter for potentially faster chunking
+    splitter = TokenTextSplitter(chunk_size=1500, chunk_overlap=150) # Adjust chunk_size as needed
+
     chunks = splitter.split_text(narrative_text)
-
     chain = _build_chain()
-    parsed_chunks: List[dict] = []
-    
-    embedding_model = HuggingFaceEmbeddings(
-    model_name="all-MiniLM-L6-v2"  # Or try 'all-mpnet-base-v2' for higher accuracy
-    )
-    vectorstore = Chroma(
-        collection_name="earnings_docs",
-        embedding_function=embedding_model,
-        persist_directory="chroma_index"
-    )
 
-    base_metadata = {
-        "source": os.path.basename(pdf_path)
-        # TODO: ADD EXTRA METADATA FOR SEARCH
-    }
-    docs: List[Document] = []
-    for i, table in enumerate(tables):
-        rows = [" | ".join(table.columns)]
-        rows += [" | ".join(row) for row in table.itertuples()]
-        
-        docs.append(Document(
-            page_content="\n".join(rows),
-            metadata={
-                **base_metadata,
-                "table_id": i
-            }
-        ))
-    for i, chunk in enumerate(chunks):
+    # Parallel processing of chunks
+    def process_chunk(chunk: str):
         try:
             raw = chain.invoke({"chunk": chunk})
-            parsed = json.loads(raw)
-            parsed_chunks.append(parsed)
-            
-            docs.append(Document(
-                page_content=chunk,
-                metadata={
-                    **base_metadata,
-                    "chunk_id": i
-                }
-            ))
+            return json.loads(raw)
         except json.JSONDecodeError:
-            print("Skipping malformed output")
-            continue
-        
-    vectorstore.persist()
+            print(f"Skipping malformed output for chunk: {chunk[:50]}...")
+            return None
 
-    return [json.dumps(t) for t in tables], parsed_chunks
+    parallel_processor = RunnableParallel(tasks={f"chunk_{i}": RunnableLambda(process_chunk) for i in range(len(chunks))})
+    results = parallel_processor.invoke(chunks)
+    parsed_chunks: List[dict] = [res for res in results.values() if res is not None]
 
+    return table_csvs, parsed_chunks
 
 
 def run_pipeline_on_text(raw_text: str) -> List[dict]:
-    splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
+    # Use TokenTextSplitter for potentially faster chunking
+    splitter = TokenTextSplitter(chunk_size=1500, chunk_overlap=150) # Adjust chunk_size as needed
     chunks = splitter.split_text(raw_text)
-
     chain = _build_chain()
-    results = []
 
-    for chunk in chunks:
+    # Parallel processing of chunks
+    def process_chunk(chunk: str):
         try:
             out = chain.invoke({"chunk": chunk})
-            results.append(json.loads(out))
+            return json.loads(out)
         except json.JSONDecodeError:
-            print("Skipping malformed output")
-            continue
+            print(f"Skipping malformed output for chunk: {chunk[:50]}...")
+            return None
 
-    return results
+    parallel_processor = RunnableParallel(tasks={f"chunk_{i}": RunnableLambda(process_chunk) for i in range(len(chunks))})
+    results = parallel_processor.invoke(chunks)
+    parsed_results: List[dict] = [res for res in results.values() if res is not None]
+
+    return parsed_results
 
 
 def extract_tables(pdf_path: str) -> List[str]:
     tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True, stream=True)
-    return [json.dumps(fix_table_formatting(t)) for t in tables]
+    return [fix_table_formatting(t) for t in tables]
 
 def fix_table_formatting(table: pd.DataFrame):
     # `apply` analyzes the table, vertically by default

@@ -1,6 +1,5 @@
 import sys, os, json
 from pathlib import Path
-
 from langchain_pipeline import process_earnings_pdf, run_pipeline_on_text
 
 def full_pipeline(pdf_path: str) -> None:
