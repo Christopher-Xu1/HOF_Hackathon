@@ -1,0 +1,20 @@
+You have analysed multiple sections of an earnings report.  
+Below is the list of section‑level JSON outputs you produced:
+
+{input}
+
+Provide a high‑level, investment‑grade summary that:
+
+1. Highlights the most important trends and drivers.
+2. Flags any surprises or material changes (positive or negative).
+3. Synthesises management sentiment.
+4. Lists the 3‑5 KPIs an analyst should watch next quarter.
+
+Return JSON only:
+
+{{
+  "tldr":      "<3–4 sentences>",
+  "highlights":[ "<bullet 1>", "<bullet 2>", "<bullet 3>" ],
+  "watchlist": [ "<KPI 1>", "<KPI 2>", "<KPI 3>" ],
+  "overallSentiment": "<positive | neutral | negative>"
+}}

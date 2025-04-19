@@ -1,13 +1,15 @@
-# langchain_pipeline.py
 from __future__ import annotations
 import os, json
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter, TokenTextSplitter
 from langchain_core.runnables import RunnableParallel, RunnableLambda  # Corrected imports
+
 from langchain.schema.output_parser import StrOutputParser
+from langchain_core.output_parsers import JsonOutputParser # Import JsonOutputParser from the correct location
+
 import pdfplumber, pathlib, re, statistics
 import tabula
 import pandas as pd
@@ -17,92 +19,104 @@ os.environ["JAVA_HOME"] = "/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Content
 assert os.getenv("OPENAI_API_BASE"), "API base not set"
 assert os.getenv("OPENROUTER_API_KEY"), "Key not set"
 
-# 1. Load custom prompt from a txt file
+
+
+# 1. Load custom prompts from txt files
 # --------------------------------------------------------------------------
-def _load_prompt() -> PromptTemplate:
-    with open("backend/src/prompts/earnings_summarization.txt") as f:
+def _load_prompt(file_path: str) -> PromptTemplate:
+    with open(file_path) as f:
         prompt_text = f.read()
-    return PromptTemplate(input_variables=["chunk"], template=prompt_text)
+    return PromptTemplate(input_variables=["input"], template=prompt_text)
+
+summary_prompt = _load_prompt("backend/src/prompts/earnings_summarization.txt")
+title_prompt = _load_prompt("backend/src/prompts/chunk_title.txt")
+overall_analysis_prompt = _load_prompt("backend/src/prompts/overall_analysis.txt")
 
 # --------------------------------------------------------------------------
 # 2. Build the LLM chain (OpenRouter)
 # --------------------------------------------------------------------------
-
-def _build_chain():
-    prompt = PromptTemplate(
-        template=open("backend/src/prompts/earnings_summarization.txt").read(),
-        input_variables=["chunk"],
-    )
-
-    llm = ChatOpenAI(
+def _build_llm():
+    return ChatOpenAI(
         model="mistralai/Mixtral-8x7b-instruct",
         openai_api_base=os.getenv("OPENAI_API_BASE"),   # "https://openrouter.ai/api/v1"
         openai_api_key =os.getenv("OPENROUTER_API_KEY"),
         temperature=0,
     )
-    
 
-    return prompt | llm | StrOutputParser()
-
+llm = _build_llm()
 
 # --------------------------------------------------------------------------
-# 3. Public entry-point: Process PDF
+# 3. Define individual processing chains
 # --------------------------------------------------------------------------
-def process_earnings_pdf(pdf_path: str) -> Tuple[List[str], List[dict]]:
-    """
-    Returns:
-        - table_csvs: List of Pandas DataFrame objects (handled elsewhere)
-        - llm_summary: List of parsed JSON dicts from narrative text
+process_chunk_chain = (
+    {"chunk": lambda x: x}
+    | summary_prompt
+    | llm
+    | JsonOutputParser()
+)
+
+title_chunk_chain = (
+    {"chunk": lambda x: x}
+    | title_prompt
+    | llm
+    | StrOutputParser()
+)
+
+# --------------------------------------------------------------------------
+# 4. Orchestrator Bot Logic
+# --------------------------------------------------------------------------
+def orchestrate_analysis(results: Dict[str, Dict]):
+    chunk_analyses = {
+        chunk_id: {
+            "title": title_chunk_chain.invoke({"chunk": result.get("sentimentReasoning", "") if result else "No Data"}),
+            "analysis": result if result else None,
+        }
+        for chunk_id, result in results.items()
+    }
+
+    all_kpis = [item["analysis"].get("kpis", {}) for item in chunk_analyses.values() if item["analysis"]]
+    all_sentiments = [item["analysis"].get("sentiment", "") for item in chunk_analyses.values() if item["analysis"]]
+
+    overall_context = f"""
+    Individual Chunk Analyses: {chunk_analyses}
+    Extracted KPIs across all chunks: {all_kpis}
+    Overall Sentiments: {all_sentiments}
     """
 
+    overall_analysis = llm.invoke(overall_analysis_prompt.format(input=overall_context)).content
+
+    return {"chunk_analyses": chunk_analyses, "overall_analysis": overall_analysis}
+
+# --------------------------------------------------------------------------
+# 5. Public entry-point: Process PDF with Orchestrator
+# --------------------------------------------------------------------------
+def process_earnings_pdf_with_orchestrator(pdf_path: str) -> Dict[str, Any]:
     table_csvs: List[str] = extract_tables(pdf_path)
     narrative_text: str = extract_narrative_text(pdf_path)
 
     if not narrative_text.strip():
-        return table_csvs, []
+        return {"tables": table_csvs, "chunk_analyses": [], "overall_analysis": "No narrative text to analyze."}
 
-    # Use TokenTextSplitter for potentially faster chunking
-    splitter = TokenTextSplitter(chunk_size=1500, chunk_overlap=150) # Adjust chunk_size as needed
-
+    splitter = TokenTextSplitter(chunk_size=1500, chunk_overlap=150)
     chunks = splitter.split_text(narrative_text)
-    chain = _build_chain()
 
-    # Parallel processing of chunks
-    def process_chunk(chunk: str):
-        try:
-            raw = chain.invoke({"chunk": chunk})
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            print(f"Skipping malformed output for chunk: {chunk[:50]}...")
-            return None
+    parallel_processor = RunnableParallel(tasks={f"chunk_{i}": process_chunk_chain for i in range(len(chunks))})
+    chunk_results = parallel_processor.invoke(chunks)
 
-    parallel_processor = RunnableParallel(tasks={f"chunk_{i}": RunnableLambda(process_chunk) for i in range(len(chunks))})
-    results = parallel_processor.invoke(chunks)
-    parsed_chunks: List[dict] = [res for res in results.values() if res is not None]
+    final_analysis = orchestrate_analysis(chunk_results)
+    final_analysis["tables"] = table_csvs
+    return final_analysis
 
-    return table_csvs, parsed_chunks
-
-
-def run_pipeline_on_text(raw_text: str) -> List[dict]:
-    # Use TokenTextSplitter for potentially faster chunking
-    splitter = TokenTextSplitter(chunk_size=1500, chunk_overlap=150) # Adjust chunk_size as needed
+def run_pipeline_on_text_with_orchestrator(raw_text: str) -> Dict[str, Any]:
+    splitter = TokenTextSplitter(chunk_size=1500, chunk_overlap=150)
     chunks = splitter.split_text(raw_text)
-    chain = _build_chain()
 
-    # Parallel processing of chunks
-    def process_chunk(chunk: str):
-        try:
-            out = chain.invoke({"chunk": chunk})
-            return json.loads(out)
-        except json.JSONDecodeError:
-            print(f"Skipping malformed output for chunk: {chunk[:50]}...")
-            return None
+    parallel_processor = RunnableParallel(tasks={f"chunk_{i}": process_chunk_chain for i in range(len(chunks))})
+    chunk_results = parallel_processor.invoke(chunks)
 
-    parallel_processor = RunnableParallel(tasks={f"chunk_{i}": RunnableLambda(process_chunk) for i in range(len(chunks))})
-    results = parallel_processor.invoke(chunks)
-    parsed_results: List[dict] = [res for res in results.values() if res is not None]
+    final_analysis = orchestrate_analysis(chunk_results)
+    return final_analysis
 
-    return parsed_results
 
 
 def extract_tables(pdf_path: str) -> List[str]:

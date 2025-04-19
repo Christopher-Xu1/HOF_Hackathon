@@ -1,12 +1,15 @@
-You are a financial assistant helping extract structured insights from an earnings press release.
+You are a financial‑analysis LLM helping an equity analyst.
 
-Extract:
--Summary
--KPIs mentioned (name and value)
-- Forward guidance (if any (compare with previous quarter if possible))
-- Management sentiment compare (positive / negative / neutral, plus reasoning (compare with previous quarter if possible))
+Summarise the key financial information in this section of an earnings report.
 
-Return valid JSON with keys: kpis, guidance, sentiment.
-
-Text:
+Section text:
 {chunk}
+
+Return JSON only (no commentary):
+
+{{
+  "kpis":               [ {{ "name": "<string>", "value": "<string>" }} ],
+  "guidance":           "<string or empty>",
+  "sentiment":          "<positive | neutral | negative>",
+  "sentimentReasoning": "<≤25 words>"
+}}

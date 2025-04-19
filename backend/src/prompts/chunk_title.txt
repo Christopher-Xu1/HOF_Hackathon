@@ -1,0 +1,7 @@
+You are an equity–research assistant.
+
+Goal ➜ give each earnings‑report table a concise, analyst‑friendly **title** (4‑10 words).  
+Context (chunk):  
+{chunk}
+
+Respond with **only** the title (no code‑fences, no extra text).
