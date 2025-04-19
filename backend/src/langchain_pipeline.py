@@ -91,7 +91,7 @@ def orchestrate_analysis(results: Dict[str, Dict]):
 # 5. Public entry-point: Process PDF with Orchestrator
 # --------------------------------------------------------------------------
 def process_earnings_pdf_with_orchestrator(pdf_path: str) -> Dict[str, Any]:
-    table_csvs: List[str] = extract_tables(pdf_path)
+    table_csvs: List[dict] = extract_tables(pdf_path)
     narrative_text: str = extract_narrative_text(pdf_path)
 
     if not narrative_text.strip():
@@ -119,7 +119,7 @@ def run_pipeline_on_text_with_orchestrator(raw_text: str) -> Dict[str, Any]:
 
 
 
-def extract_tables(pdf_path: str) -> List[str]:
+def extract_tables(pdf_path: str):
     tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True, stream=True)
     return [fix_table_formatting(t) for t in tables]
 
@@ -154,7 +154,7 @@ def fix_table_formatting(table: pd.DataFrame):
     if buffer:
         fixed_rows.append(buffer)
         
-    return pd.DataFrame(fixed_rows, columns=df_clean.columns)
+    return pd.DataFrame(fixed_rows, columns=df_clean.columns).to_dict()
 
 def title_tables(csv_folder: str) -> List[Tuple[Path, str]]:
     """
