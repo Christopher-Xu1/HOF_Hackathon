@@ -28,9 +28,9 @@ def _load_prompt(file_path: str) -> PromptTemplate:
         prompt_text = f.read()
     return PromptTemplate(input_variables=["input"], template=prompt_text)
 
-summary_prompt = _load_prompt("backend/src/prompts/earnings_summarization.txt")
-title_prompt = _load_prompt("backend/src/prompts/chunk_title.txt")
-overall_analysis_prompt = _load_prompt("backend/src/prompts/overall_analysis.txt")
+summary_prompt = _load_prompt("prompts/earnings_summarization.txt")
+title_prompt = _load_prompt("prompts/chunk_title.txt")
+overall_analysis_prompt = _load_prompt("prompts/overall_analysis.txt")
 
 # --------------------------------------------------------------------------
 # 2. Build the LLM chain (OpenRouter)
