@@ -173,7 +173,6 @@ def fetch_latest_earnings_pdf(company_name, serpapi_api_key):
         print("❌ Failed to process the PDF.")
         return None
 
-# Step 6: Run
 if __name__ == "__main__":
     company = input("Enter company name (e.g., Amazon): ").strip()
     api_key = input("Enter your SerpAPI API key: ").strip()

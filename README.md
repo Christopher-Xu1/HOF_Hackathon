@@ -8,6 +8,11 @@ pip install:
 -flask
 -flask-cors
 npm install
+npm install react-json-view
+npm install react-icons
+
+
+https://serpapi.com/dashboard
 
 
 
