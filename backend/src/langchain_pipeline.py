@@ -7,6 +7,10 @@ from langchain_openai import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema.output_parser import StrOutputParser
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain.docstore.document import Document
+from langchain.chains.retrieval_qa.base import RetrievalQA
+from langchain.vectorstores import Chroma
 import pdfplumber, pathlib, re, statistics
 import tabula
 import pandas as pd
@@ -40,41 +44,99 @@ def _build_chain():
         temperature=0,
     )
     
+    embedding_model = HuggingFaceEmbeddings(
+        model_name="all-MiniLM-L6-v2"  # Or try 'all-mpnet-base-v2' for higher accuracy
+    )
+    vectorstore = Chroma(
+        collection_name="earnings_docs",
+        embedding_function=embedding_model,
+        persist_directory="chroma_index"
+    )
 
-    return prompt | llm | StrOutputParser()
+    # Create the retriever with metadata filtering if needed
+    retriever = vectorstore.as_retriever(
+        search_kwargs={
+            #"k": 5,  # number of relevant docs to retrieve
+            #"filter": {"company": "Amazon", "quarter": "Q4 2025"}  # example filter
+        }
+    )
+    
+    qa_chain = RetrievalQA.from_chain_type(
+        llm=llm,
+        retriever=retriever,
+        return_source_documents=True
+    )
+
+    return prompt | qa_chain | StrOutputParser()
 
 
 # --------------------------------------------------------------------------
 # 3. Public entry-point: Process PDF
 # --------------------------------------------------------------------------
-def process_earnings_pdf(pdf_path: str) -> Tuple[List[str], List[dict]]:
+def process_earnings_pdf(pdf_path: str) -> Tuple[List[pd.DataFrame], List[dict]]:
     """
     Returns:
         - table_csvs: List of Pandas DataFrame objects (handled elsewhere)
         - llm_summary: List of parsed JSON dicts from narrative text
     """
 
-    table_csvs: List[str] = extract_tables(pdf_path)
+    tables: List[pd.DataFrame] = extract_tables(pdf_path)
     narrative_text: str = extract_narrative_text(pdf_path)
 
     if not narrative_text.strip():
-        return table_csvs, []
+        return tables, []
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
     chunks = splitter.split_text(narrative_text)
 
     chain = _build_chain()
     parsed_chunks: List[dict] = []
+    
+    embedding_model = HuggingFaceEmbeddings(
+    model_name="all-MiniLM-L6-v2"  # Or try 'all-mpnet-base-v2' for higher accuracy
+    )
+    vectorstore = Chroma(
+        collection_name="earnings_docs",
+        embedding_function=embedding_model,
+        persist_directory="chroma_index"
+    )
 
-    for chunk in chunks:
+    base_metadata = {
+        "source": os.path.basename(pdf_path)
+        # TODO: ADD EXTRA METADATA FOR SEARCH
+    }
+    docs: List[Document] = []
+    for i, table in enumerate(tables):
+        rows = [" | ".join(table.columns)]
+        rows += [" | ".join(row) for row in table.itertuples()]
+        
+        docs.append(Document(
+            page_content="\n".join(rows),
+            metadata={
+                **base_metadata,
+                "table_id": i
+            }
+        ))
+    for i, chunk in enumerate(chunks):
         try:
             raw = chain.invoke({"chunk": chunk})
-            parsed_chunks.append(json.loads(raw))
+            parsed = json.loads(raw)
+            parsed_chunks.append(parsed)
+            
+            docs.append(Document(
+                page_content=chunk,
+                metadata={
+                    **base_metadata,
+                    "chunk_id": i
+                }
+            ))
         except json.JSONDecodeError:
             print("Skipping malformed output")
             continue
+        
+    vectorstore.persist()
 
-    return table_csvs, parsed_chunks
+    return [json.dumps(t) for t in tables], parsed_chunks
 
 
 
@@ -98,7 +160,7 @@ def run_pipeline_on_text(raw_text: str) -> List[dict]:
 
 def extract_tables(pdf_path: str) -> List[str]:
     tables = tabula.read_pdf(pdf_path, pages='all', multiple_tables=True, stream=True)
-    return [fix_table_formatting(t) for t in tables]
+    return [json.dumps(fix_table_formatting(t)) for t in tables]
 
 def fix_table_formatting(table: pd.DataFrame):
     # `apply` analyzes the table, vertically by default
