@@ -1,3 +1,4 @@
+#Scraper for fetching the latest earnings PDF from a company's investor relations page using SerpAPI and Selenium.
 import os
 import re
 import requests

@@ -1,22 +1,27 @@
 import React, { useState } from "react";
 
 function App() {
-  const [file, setFile] = useState(null);
+  const [name, setName] = useState("");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const handleUpload = async () => {
-    if (!file) return;
+  const handleSubmit = async () => {
+    if (!name) return;
     setLoading(true);
-    const formData = new FormData();
-    formData.append("file", file);
 
-    const res = await fetch("http://localhost:5000/upload", {
+    const response = await fetch("http://localhost:5000/submit", {
       method: "POST",
-      body: formData,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: name,
+        serpapi_api_key:
+          "0dd9088229b70f2b5740ad8161755df192087552c216747df776310b6feb23fe", // Pass the API key here
+      }),
     });
 
-    const json = await res.json();
+    const json = await response.json();
     setData(json);
     setLoading(false);
   };
@@ -25,26 +30,24 @@ function App() {
     <div>
       <h1>Earnings Extractor</h1>
 
-      <div className="upload-wrapper">
-        <p>Upload your earnings statement:</p>
-        <label htmlFor="file-upload" className="custom-file-upload">
-          📁 Choose File
-        </label>
+      <div className="input-wrapper">
+        <p>Enter your name:</p>
         <input
-          id="file-upload"
-          type="file"
-          onChange={(e) => setFile(e.target.files[0])}
+          type="text"
+          placeholder="Enter your name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
         />
-        {file && <p className="filename">Selected: {file.name}</p>}
-        <button onClick={handleUpload} disabled={!file}>
-          Upload
+        {name && <p className="name">Entered: {name}</p>}
+        <button onClick={handleSubmit} disabled={!name}>
+          Submit
         </button>
       </div>
 
       {loading && <p>Processing...</p>}
       {data && (
         <div>
-          <h2>Extracted Data:</h2>
+          <h2>Response Data:</h2>
           <pre>{JSON.stringify(data, null, 2)}</pre>
         </div>
       )}
@@ -52,12 +55,10 @@ function App() {
       <div>
         <h2>How to Use:</h2>
         <ol>
-          <li>
-            Click on the "Choose File" button to select your earnings statement.
-          </li>
-          <li>Click on the "Upload" button to upload the file.</li>
+          <li>Enter your name in the text input field.</li>
+          <li>Click on the "Submit" button to send the name.</li>
           <li>Wait for the processing to complete.</li>
-          <li>Your extracted data will be displayed below.</li>
+          <li>The response data will be displayed below.</li>
         </ol>
       </div>
     </div>
