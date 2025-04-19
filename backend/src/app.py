@@ -45,7 +45,7 @@ def handle_submit():
     # ======= Run the Pipeline =======
     try:
         print(f"\n⚙️ Running pipeline on: {filepath}")
-        subprocess.run(["python", "pipeline.py", filepath], check=True)
+        subprocess.run(["python", "backend/src/run_full_pipeline.py", filepath], check=True)
 
         output_filename = os.path.basename(filepath).replace(".pdf", ".json")
         output_path = os.path.join(OUTPUT_FOLDER, output_filename)

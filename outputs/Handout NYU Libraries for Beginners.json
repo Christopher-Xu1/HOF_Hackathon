@@ -1,0 +1,49 @@
+{
+  "chunk_analyses": {
+    "tasks": {
+      "title": " \"Q1 Earnings Report: Company XYZ\"",
+      "analysis": {
+        "chunk_0": {
+          "kpis": [
+            {
+              "name": "Number of libraries",
+              "value": "7"
+            },
+            {
+              "name": "Number of databases",
+              "value": "1,400+"
+            },
+            {
+              "name": "Number of e-books and articles available",
+              "value": "<not specified>"
+            },
+            {
+              "name": "Number of partner libraries for E-ZBorrow",
+              "value": "<not specified>"
+            }
+          ],
+          "guidance": "Explore the online resources, books, journals, and article databases available at NYU Libraries. Utilize the 1,400+ databases and E-ZBorrow service for books not available in NYU Libraries.",
+          "sentiment": "neutral",
+          "sentimentReasoning": "The text is informative and neutral, providing factual information about the library resources."
+        },
+        "chunk_1": {
+          "kpis": [
+            {
+              "name": "Number of library locations",
+              "value": "7"
+            },
+            {
+              "name": "Number of database subscriptions",
+              "value": "1,400"
+            }
+          ],
+          "guidance": "Consider using NYU Libraries' online resources for access to books, journals, article databases, and streaming video. Utilize the search system for finding physical and electronic resources, and consider interlibrary loan or E-ZBorrow for materials not available at NYU.",
+          "sentiment": "positive",
+          "sentimentReasoning": "The report emphasizes the extensive resources and services available through NYU Libraries, both physically and online."
+        }
+      }
+    }
+  },
+  "overall_analysis": " {\n  \"tldr\": \"Company XYZ's Q1 earnings report highlights the extensive resources and services available at NYU Libraries, with 7 library locations, 1,400 database subscriptions, and a vast collection of e-books, articles, and streaming video. The report emphasizes the convenience of online resources, interlibrary loan, and E-ZBorrow services.\",\n  \"highlights\": [\n    \"NYU Libraries offer 7 library locations and 1,400 database subscriptions.\",\n    \"A wide range of e-books, articles, and streaming video are accessible through the libraries.\",\n    \"Online resources, interlibrary loan, and E-ZBorrow services enhance the user experience and accessibility.\"\n  ],\n  \"watchlist\": [\n    \"Number of library locations\",\n    \"Number of database subscriptions\",\n    \"Number of e-books and articles available\"\n  ],\n  \"overallSentiment\": \"positive\"\n}",
+  "tables": []
+}

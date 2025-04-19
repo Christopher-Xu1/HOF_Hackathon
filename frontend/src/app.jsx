@@ -1,7 +1,11 @@
 import React, { useState } from "react";
 import ReactJson from "react-json-view";
-import { FiCopy, FiDownload } from "react-icons/fi";
+import { FiCopy, FiDownload, FiSearch, FiUpload, FiFileText } from "react-icons/fi";
+import { TbSailboat } from "react-icons/tb";
+import sailLogo from "./SAIL.png";
 import "./App.css";
+import loadingGif from "./sail.gif";
+
 
 function App() {
   const [mode, setMode] = useState("search"); // 'search' or 'upload'
@@ -64,109 +68,146 @@ function App() {
   };
 
   return (
-    <div className="app-container">
-      <h1 className="title">Earnings Extractor</h1>
-      <div className="cards-container">
-        {/* Input Card */}
-        <div className="card input-card">
-          <h2>Input</h2>
+    <div className="dashboard-container">
+      <div className="dashboard-header">
+        <div className="logo-section">
+          <img src={sailLogo} alt="SAIL Logo" className="logo" />
+          <h1 className="title">sail</h1>
+        </div>
+        <p className="subtitle">Financial Data Extraction Tool</p>
+      </div>
 
-          {/* Mode Selector */}
-          <div className="mode-toggle">
-            <label>
-              <input
-                type="radio"
-                value="search"
-                checked={mode === "search"}
-                onChange={() => setMode("search")}
-              />
-              Search by Name
-            </label>
-            <label>
-              <input
-                type="radio"
-                value="upload"
-                checked={mode === "upload"}
-                onChange={() => setMode("upload")}
-              />
-              Upload PDF
-            </label>
+      <div className="dashboard-content">
+        <div className="input-panel">
+          <div className="panel-header">
+            <h2>Extract Earnings Data</h2>
           </div>
 
-          {mode === "search" ? (
-  <>
-    <label>Enter a query:</label>
-    <input
-      type="text"
-      value={name}
-      placeholder="e.g., Apple Q1 2023 earnings"
-      onChange={(e) => setName(e.target.value)}
-    />
-  </>
-) : (
-  <>
-    <label htmlFor="pdf-upload">Upload a PDF file:</label>
-    <input
-      id="pdf-upload"
-      type="file"
-      accept=".pdf"
-      style={{
-        marginTop: "0.5rem",
-        marginBottom: "1rem",
-        padding: "0.4rem",
-        border: "1px solid #ccc",
-        borderRadius: "6px",
-        background: "#fff",
-        width: "100%",
-      }}
-      onChange={(e) => setFile(e.target.files[0])}
-    />
-    {file && <p><strong>Selected:</strong> {file.name}</p>}
-  </>
-)}
+          <div className="mode-toggle">
+            <button
+              className={`mode-button ${mode === "search" ? "active" : ""}`}
+              onClick={() => setMode("search")}
+            >
+              <FiSearch /> Search by Keywords
+            </button>
+            <button
+              className={`mode-button ${mode === "upload" ? "active" : ""}`}
+              onClick={() => setMode("upload")}
+            >
+              <FiUpload /> Upload Report
+            </button>
+          </div>
 
+          <div className="input-section">
+            {mode === "search" ? (
+              <>
+                <label>Enter search query:</label>
+                <div className="search-input-wrapper">
+                  <FiSearch className="search-icon" />
+                  <input
+                    type="text"
+                    value={name}
+                    placeholder="e.g., Apple Q1 2023 earnings report"
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <label htmlFor="pdf-upload">Upload earnings report (PDF):</label>
+                <div className="file-upload-area">
+                  <input
+                    id="pdf-upload"
+                    type="file"
+                    accept=".pdf"
+                    onChange={(e) => setFile(e.target.files[0])}
+                  />
+                  {file && (
+                    <div className="file-info">
+                      <FiFileText />
+                      <span>{file.name}</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
-          <button
-            onClick={handleSubmit}
-            disabled={
-              (mode === "search" && !name) || (mode === "upload" && !file)
-            }
-          >
-            Submit
-          </button>
+            <button
+              className="submit-button"
+              onClick={handleSubmit}
+              disabled={
+                (mode === "search" && !name) || (mode === "upload" && !file) || loading
+              }
+            >
+              {loading ? "Processing..." : "Extract Data"}
+            </button>
+          </div>
 
-          <div className="instructions">
-            <h3>Instructions:</h3>
-            <ol>
-              <li>Select a mode above</li>
-              <li>Search: type a company + quarter + "earnings"</li>
-              <li>Upload: choose a PDF earnings report</li>
-              <li>Click Submit to process</li>
-            </ol>
+          <div className="usage-guide">
+            <h3>Quick Guide</h3>
+            <div className="guide-item">
+              <div className="guide-number">1</div>
+              <div className="guide-text">
+                Select your preferred data source method above
+              </div>
+            </div>
+            <div className="guide-item">
+              <div className="guide-number">2</div>
+              <div className="guide-text">
+                {mode === "search"
+                  ? "Enter a specific query (company name, quarter, year)"
+                  : "Upload an earnings report PDF file"}
+              </div>
+            </div>
+            <div className="guide-item">
+              <div className="guide-number">3</div>
+              <div className="guide-text">
+                Click "Extract Data" to process and analyze
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Output Card */}
-        <div className="card output-card">
-          <div className="output-header">
-            <h2>Output</h2>
+        <div className="results-panel">
+          <div className="panel-header">
+            <h2>Financial Data Output</h2>
             {data && (
-              <div className="output-actions">
-                <button title="Copy" onClick={handleCopy}>
+              <div className="action-buttons">
+                <button title="Copy JSON" onClick={handleCopy} className="icon-button">
                   <FiCopy />
                 </button>
-                <button title="Download" onClick={handleDownload}>
+                <button title="Download JSON" onClick={handleDownload} className="icon-button">
                   <FiDownload />
                 </button>
               </div>
             )}
           </div>
-          {loading && <p>Processing...</p>}
-          {data ? (
-            <ReactJson src={data} collapsed={1} enableClipboard={false} />
-          ) : (
-            <p className="no-data">No data to display yet.</p>
-          )}
+
+          <div className="results-content">
+            {loading ? (
+              <div className="loading-indicator">
+                <img src={loadingGif} alt="Loading..." className="loading-gif" />
+                <p>Extracing Data</p>
+              </div>
+            ) : data ? (
+              <div className="json-viewer">
+                <ReactJson 
+                  src={data} 
+                  theme="monokai" 
+                  collapsed={1} 
+                  enableClipboard={false}
+                  displayDataTypes={false}
+                  displayObjectSize={false}
+                />
+              </div>
+            ) : (
+              <div className="empty-state">
+                <FiFileText className="empty-icon" />
+                <p>No financial data to display yet</p>
+                <span>Data will appear here after extraction</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

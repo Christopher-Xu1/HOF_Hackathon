@@ -1,0 +1,38 @@
+{
+  "chunk_analyses": {
+    "tasks": {
+      "title": " I don't have the earnings report table in this context. However, I can provide an example of how I would title an earnings report table:\n\n\"Q3 2022 Company X Earnings Summary\"",
+      "analysis": {
+        "chunk_0": {
+          "kpis": [
+            {
+              "name": "Revenues (GAAP)",
+              "value": "Q4 2"
+            }
+          ]
+        },
+        "chunk_1": {
+          "kpis": [
+            {
+              "name": "Q4 2024 Revenues",
+              "value": "Not specified in the text"
+            },
+            {
+              "name": "Q4 2024 Non-GAAP Constant Currency Revenues",
+              "value": "Not provided in the text"
+            },
+            {
+              "name": "Q4 2024 Percentage Change in Revenues",
+              "value": "Not specified in the text"
+            },
+            {
+              "name": "Q4 2"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "overall_analysis": " {\n  \"tldr\": \"The Q3 2",
+  "tables": [
+    

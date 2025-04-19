@@ -1,0 +1,15 @@
+{
+  "company": "Amazon",
+  "quarter": "Q4 2025",
+  "structured_data": {
+    "Revenue": 149204,
+    "Net Income": 10724,
+    "EPS": 1.39
+  },
+  "guidance": "Amazon expects Q1 2026 revenue between $138B\u2013$143.5B.",
+  "sentiment": "Positive",
+  "kpis": [
+    "AWS growth 13%",
+    "Advertising revenue up 24%"
+  ]
+}
